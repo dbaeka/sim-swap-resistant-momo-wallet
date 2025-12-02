@@ -1,0 +1,403 @@
+\documentclass[11pt, letterpaper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{caption}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{array}
+
+\usepackage{mathptmx}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+% --- DEFINE SOLIDITY LANGUAGE ---
+\lstdefinelanguage{Solidity}{
+    keywords={break, case, catch, class, const, continue, debugger, default, delete, do, else, enum, export, extends, false, finally, for, function, if, import, in, instanceof, new, null, return, super, switch, this, throw, true, try, typeof, var, void, while, with},
+    morekeywords={boolean, byte, char, double, float, int, long, short, void, block, backtrace, delegatecall, external, public, protected, private, internal, constant, payable, pure, view, returns, memory, storage, calldata, event, modifier, mapping, struct, uint256, address, bytes32, require, msg, block, emit},
+    sensitive=false,
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+    morestring=[b]",
+    morestring=[b]'
+}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\title{\textbf{A SIM-Swap-Proof Mobile Money System Using a Smart Contract Wallet and Social Recovery}}
+\author{By: Delmwin Baeka}
+\date{40277017\\November 28, 2025}
+
+\begin{document}
+
+    \maketitle
+
+
+    \section{Introduction}\label{sec:introduction}
+
+    \subsection{Context: The Mobile Money Landscape}\label{subsec:context:-the-mobile-money-landscape}
+
+    Mobile money has revolutionized financial inclusion in Africa, particularly in Ghana, where it serves as the primary banking solution for millions of citizens~\cite{gsma_sotir2024}.
+    Unlike traditional banking, which relied on physical branches and internet-connected smartphones, mobile money primarily started operations via \textbf{USSD (Unstructured Supplementary Service Data)} on basic feature phones (popularly referred to as ``Yam Phone'').
+
+    In the mobile ecosystem, the user's identity is tied strictly to their SIM card and phone number.
+    This reliance on the phone number as a singular identifier creates a fragile security architecture where possession of the SIM card is equated with identity verification because the SIM card is the gateway to receiving OTPs and transaction approvals.
+
+    \subsection{The Problem: SIM-Swap Fraud}\label{subsec:the-problem:-sim-swap-fraud}
+    The reliance on the phone number as a the primary source of security allows for so many types of fraud opportunities.
+    One particularly popular one is SIM-Swap Fraud, where in this attack, malicious actors use social engineering to convince a Mobile Network Operator (MNO) to transfer a victim's phone number to a new SIM card under the attacker's control~\cite{gsma2019, nist_simswap}.
+    Even worse is if one loses their phone, the thief can easily perform a SIM swap to take over the victim's mobile money account.
+    The attack typically follows these steps:
+    \begin{enumerate}
+        \item The attacker gathers personal information about the victim (e.g., full name, date of birth, address) through phishing, social media, or data breaches.
+        \item The attacker contacts the MNO's customer support, impersonating the victim, and requests a SIM swap citing reasons such as a lost or damaged SIM.
+        \item The MNO verifies the request using knowledge-based authentication (e.g., answering security questions, providing a PIN).
+        \item Upon successful verification, the MNO deactivates the victim's SIM and activates a new SIM with the same phone number for the attacker.
+    \end{enumerate}
+
+    Once the swap is complete:
+    \begin{enumerate}
+        \item The victim's phone loses network connection.
+        \item The attacker receives all SMS messages and calls intended for the victim.
+        \item The attacker can reset PINs and bypass SMS-based Two-Factor Authentication (2FA), draining the victim's mobile money wallet.
+    \end{enumerate}
+
+    \subsection{The Solution: Sim-Swap-Proof Wallets with Social Recovery}\label{subsec:the-solution:-sim-swap-proof-wallets-with-social-recovery}
+    This project proposes a sim-swap-proof mobile money system using a smart contract wallet with social recovery.
+    Using a decentralized architecture with blockchain decouples identity (phone number) from security (private keys).
+    We introduce a system where the private key is stored securely within a Java Card applet on the SIM card, effectively turning a feature phone into a hardware wallet~\cite{javacard_spec}.
+    The funds are then held in a smart contract wallet on the Ethereum blockchain.
+
+    Crucially, this wallet implements \textbf{Social Recovery}, a mechanism advocated by Vitalik Buterin~\cite{buterin2021}, which allows users to restore access via a threshold of trusted ``Guardians'' rather than relying on a centralized customer support agent who can be bribed or tricked.
+    As a result, even if an attacker successfully performs a SIM swap, they cannot access the funds without also compromising the guardians.
+
+
+    \section{Background \& Related Concepts}\label{sec:background-&-related-concepts}
+
+    \subsection{Vulnerabilities in Current Architectures}\label{subsec:vulnerabilities-in-current-architectures}
+    Traditional mobile money accounts are custodial;
+    the MNO holds the ledger and the private keys (if any exist).
+    The user's security relies entirely on the MNO's internal controls.
+    When a SIM is swapped, the ``username'' is effectively stolen.
+    Also, the recovery processes are centralized; if a user loses their PIN, they must call the MNO, introducing a human element that is prone to social engineering.
+
+    \subsection{Cryptographic Wallets: EOA vs. Smart Contracts}\label{subsec:cryptographic-wallets:-eoa-vs.-smart-contracts}
+    \begin{itemize}
+        \item \textbf{Externally Owned Accounts (EOA):} Standard cryptocurrency wallets (e.g., a standard Metamask account) are controlled by a single private key.
+        If this key is lost, the assets are irretrievable.
+        If the key is stolen, the assets are gone instantly~\cite{clark2025}.
+        This dual failure mode is not ideal for mass consumer adoption such as mobile money users.
+        \item \textbf{Smart Contract Wallets:} These are programmable accounts controlled by code.
+        They do not have a single private key but rather a set of rules defining how funds can be moved.
+        This enables advanced logic such as daily spending limits, whitelisting, and the governance required for our solution.
+    \end{itemize}
+
+    \subsection{Social Recovery}\label{subsec:social-recovery}
+    Social Recovery is a decentralized mechanism where a user designates a set of ``Guardians'' (trusted contacts, friends, or family).
+    Guardians cannot spend funds from the user's wallet.
+    Their only power is to authorize a change of ownership (key rotation) in the event of loss or theft.
+    This mimics the existing social trust models already prevalent in Ghanaian culture (e.g., Susu (savings) micro-finance groups) but enforces them via immutable blockchain code.
+
+
+    \section{System Architecture}\label{sec:system-architecture}
+    The ecosystem consists of three interconnected layers that bridge the gap between legacy telecom infrastructure and the blockchain (Etherium).
+
+    \subsection{Layer 1: The Vault (\texttt{RecoveryWallet.sol})}\label{subsec:layer-1:-the-vault-(texttt{recoverywallet.sol})}
+    The core of the system is the smart contract wallet deployed on the Ethereum network.
+    It holds the user's balances (ETH or ERC20 stablecoins) to model the standard ledger of mobile money.
+    Unlike an EOA, this contract separates the \textit{owner} (the key on the SIM) from the \textit{assets}.
+    If the SIM is lost, the contract remains safe, and the owner variable can simply be updated by the guardians after a recovery process.
+
+    \subsection{Layer 2: The Identity Layer (\texttt{Phonebook.sol})}\label{subsec:layer-2:-the-identity-layer-(texttt{phonebook.sol})}
+    To be able to still use mobile money as is, users must be able to transact via phone numbers tied to SIM cards.
+    The \texttt{Phonebook} contract maps phone numbers (\texttt{uint256}) to wallet addresses (\texttt{address}).
+    To prevent spam and Sybil attacks (fake identities flooding the registry), write access to this registry is restricted to the MNO such as MTN, while read access is public.
+    \subsection{Layer 3: The USSD Bridge (Off-Chain)}\label{subsec:layer-3:-the-ussd-bridge-(off-chain)}
+    This component handles the interaction with the feature phone:
+    \begin{enumerate}
+        \item \textbf{Transaction Build:} The user dials a USSD code (e.g., *170\#).
+        The MNO server constructs an unsigned Ethereum transaction based on the user's input (e.g.,``Send 10 GHS to +233552144023'').
+        \item \textbf{Signing (Java Card):} The unsigned transaction hash is sent to the user's SIM card.
+        A custom Java Card applet on the SIM prompts the user for a PIN.
+        If correct, the SIM signs the transaction internally.
+        The private key never leaves the SIM hardware.
+        \item \textbf{Broadcast:} The signed payload is returned to the MNO, which broadcasts it to the Ethereum network via an RPC node (e.g., Alchemy, Sepolia).
+    \end{enumerate}
+
+
+    \section{Smart Contract Implementation}\label{sec:smart-contract-implementation}
+
+    The system logic was implemented in \textbf{Solidity v0.8.0}.
+    We prioritized security patterns such as ``Checks-Effects-Interactions'' (such as in the reentrancy guard. See ~\ref{subsubsec:reentrancy-guard})
+    and strict access control modifiers (e.g., \texttt{onlyOwner}, \texttt{onlyGuardian}, \texttt{onlyMNO}) throughout the codebase.
+    The codebase is divided into two primary contracts: \texttt{RecoveryWallet} and \texttt{Phonebook} and is available on GitHub~\cite{github_repo}.
+
+    \subsection{The Recovery Wallet (\texttt{RecoveryWallet.sol})}\label{subsec:the-recovery-wallet-(texttt{recoverywallet.sol})}
+    The wallet contract manages access control and the social recovery workflow.
+    It introduces several critical security features:
+
+    \subsubsection{Replay Protection (using Nonces)}
+    In a naive implementation, if a set of guardians signs a message to ``Recover Alice'' an attacker could replay that same message years later to steal the wallet if the contract does not track or invalidate old recovery attempts.
+    For example, if guardians sign a message to recover ownership, and the contract does not use a unique identifier (like a nonce), the attacker could reuse those signatures later even after the guardians have changed to illegitimately transfer ownership.
+    By introducing a \texttt{recoveryNonce}, each recovery attempt is uniquely identified, and old signatures become invalid once the nonce is incremented, preventing replay attacks.
+    We implemented a \texttt{recoveryNonce} as:
+    \begin{lstlisting}[language=Solidity]
+    uint256 public recoveryNonce;
+    mapping(uint256 => mapping(address => bool)) public recoveryVotes;
+
+    function initiateRecovery(address _newOwner) external onlyGuardian {
+        // ... checks
+        // Increment nonce to invalidate ALL old votes immediately.
+        recoveryNonce++;
+        // update the active RecoveryRequest struct
+        recoveryVotes[recoveryNonce][msg.sender] = true;
+        emit RecoveryInitiated(msg.sender, _newOwner, recoveryNonce);
+    }
+    \end{lstlisting}
+    Every time a recovery is initiated, the nonce increments.
+    This ensures signatures are one-time-use only.
+
+    \subsubsection{Time-Lock Security}
+    Instantaneous recovery is dangerous;
+    if a guardian's key is compromised, they could steal the wallet immediately.
+    We enforced a mandatory time-lock (\texttt{recoveryDelay}) to guard against this.
+    \begin{lstlisting}[language=Solidity]
+    uint256 public recoveryDelay = 1 days;
+
+    function executeRecovery() external {
+        // ... other checks
+        require(block.timestamp >= r.initTime + recoveryDelay, "Time lock active");
+        // ... logic to change owner
+    }
+    \end{lstlisting}
+    This gives the legitimate owner 24 hours (configurable up to 90 days) to notice the attack and call \texttt{cancelRecovery()} to block the theft.
+
+    \subsubsection{Reentrancy Guard}\label{subsubsec:reentrancy-guard}
+    The \texttt{execute} function allows the wallet to interact with arbitrary external contracts (e.g., DeFi protocols, other wallets).
+    This opens the door to reentrancy attacks where when a contract calls an external contract before updating its own state, the external contract can then call back into the original contract (re-entering it) and repeat actions before the first call finishes, potentially exploiting inconsistent state and draining funds.
+    We implemented a manual reentrancy guard:
+    \begin{lstlisting}[language=Solidity]
+    bool private locked;
+    modifier nonReentrant() {
+        require(!locked, "No reentrancy");
+        locked = true;
+        _;
+        locked = false;
+    }
+    \end{lstlisting}
+    This \texttt{nonReentrant} modifier ensures that if \texttt{execute} is already running, any re-entrant calls will fail immediately.
+
+    \subsection{The Phonebook (\texttt{Phonebook.sol})}
+    The Phonebook creates a mapping between a Phone Number and a Wallet Address.
+    A major risk here is \textbf{Front-Running} where an attacker watching the mempool could see a registration transaction for a valuable phone number and submit their own transaction with a higher gas fee to claim it first.
+    Additionally, since phone numbers are sensitive personal data, we must ensure they are not exposed on-chain during the commit phase of registration.
+    To solve this, we implemented a cryptographic \textbf{Commit-Reveal Scheme}. Commit-reveal schemes work in two phases to prevent front-running and ensure data privacy by hiding the actual data during the commit phase and only revealing it later.
+
+    \subsubsection{Phase 1: Commit}
+    The MNO submits a hash of the data, not the data itself.
+    $$ \text{Commitment} = \text{Keccak256}(\text{Phone} \parallel \text{Wallet} \parallel \text{Salt}) $$
+    This hides the phone number from observers.
+    We also store the \texttt{block.timestamp} to enforce timing constraints. We define:
+    \begin{itemize}
+        \item \texttt{MIN\_COMMIT\_DELAY} = 1 minute (to prevent immediate reveals)
+        \item \texttt{MAX\_REVEAL\_WINDOW} = 1 day (to limit how long a commitment is valid)
+        \item \texttt{commits[commitment]} = timestamp
+    \end{itemize}
+    We choose \texttt{Keccak256} as the hash function because it is the standard in Ethereum and provides strong collision resistance.
+
+    \subsubsection{Phase 2: Reveal}
+    After a minimum delay (\texttt{MIN\_COMMIT\_DELAY} = 1 minute), the MNO reveals the preimage (i.e., Phone, Wallet, Salt) used to create the commitment.
+    The contract verifies the hash matches the commitment. The delay ensures that the commitment is ``finalized'' in a block before the content is revealed, making front-running impossible since the attacker cannot predict the commitment hash in advance.
+    The maximum window (\texttt{MAX\_REVEAL\_WINDOW} = 1 day) ensures that old commitments cannot be revealed indefinitely, which could lead to stale data being registered later.
+    \begin{lstlisting}[language=Solidity]
+    function reveal(uint256 phone, address wallet, bytes32 salt) external onlyMNO {
+        // ... checks
+        bytes32 generatedHash = keccak256(abi.encodePacked(_phoneNumber, _wallet, _salt));
+        require(commits[generatedHash], "No matching commit found");
+        uint256 commitTime = commitTimestamps[generatedHash];
+        // ... checks
+        address oldWallet = phoneToWallet[_phoneNumber];
+        delete commits[generatedHash];
+        delete commitTimestamps[generatedHash];
+        phoneToWallet[_phoneNumber] = _wallet;
+        // ... emit event
+    }
+    \end{lstlisting}
+
+
+    \section{Verification \& Testing}\label{sec:verification-&-testing}
+
+    We used the \textbf{Foundry} development framework for automated testing~\cite{foundry}.
+    Foundry was chosen because it allows tests to be written in Solidity, offering faster execution and precise control over the Ethereum Virtual Machine (EVM) state via cheat codes to directly manipulate time, accounts, and balances.
+
+    \subsection{Testing Methodology}
+    Our strategy focused on ``Negative Testing'', proving that the system fails when it is supposed to (e.g., unauthorized access, early reveals, replay attacks).
+    We implemented 28 distinct unit tests across two test files (\texttt{RecoveryWallet.t.sol} and \texttt{Phonebook.t.sol}).
+    Each test case is designed to cover a specific functionality or edge case, ensuring comprehensive coverage of the contract logic.
+    The list of all tests can be found in the github repository\cite{github_repo}.
+    \subsection{Foundry Cheat Codes Usage}\label{subsec:foundry-cheat-codes-usage}
+    We leveraged specific Foundry cheat codes to simulate complex blockchain scenarios:
+    \begin{itemize}
+        \item \texttt{vm.warp(uint256 time)}: This allowed us to manipulate the block timestamp.
+        \item \texttt{vm.prank(address user)}: This sets the \texttt{msg.sender} for the next call.
+        \item \texttt{vm.deal(address, amount)}: This injects fake ETH into an account, allowing us to test the wallet's ability to transfer funds (\texttt{test\_ExecuteTransfersValue}).
+        \item \texttt{vm.expectRevert()}: Used to assert that a specific function call must fail with a specific error message.
+    \end{itemize}
+
+    \subsection{Test Trace Analysis}\label{subsec:test-trace-analysis}
+    The following traces from the test runs demonstrate the robust security of our implementation.
+
+    \subsubsection{Analysis of Recovery Logic (\texttt{test\_FullRecoveryFlow})}
+    This test simulates a successful recovery initiated by guardians.
+    \begin{enumerate}
+        \item \textbf{Setup:} The wallet is deployed with 2 guardians with a threshold of 2 (require both to approve).
+        \item \textbf{Initiation:} \texttt{guardianA} calls \texttt{initiateRecovery}.
+        \begin{itemize}
+            \item \textit{Gas Used:} 139,757.
+            This is high because it initializes the \texttt{RecoveryRequest} struct and emits the \texttt{RecoveryInitiated} event.
+        \end{itemize}
+        \item \textbf{Approval:} \texttt{guardianB} calls \texttt{approveRecovery}.
+        \begin{itemize}
+            \item \textit{Gas Used:} 27,136.
+            This is efficient as it only updates the vote count.
+        \end{itemize}
+        \item \textbf{Time Travel:} We call \texttt{vm.warp(block.timestamp + 1 days + 1)} to bypass the timelock.
+        \item \textbf{Execution:} Anyone calls \texttt{executeRecovery}.
+        \begin{itemize}
+            \item \textit{Result:} The \texttt{owner} variable is updated, and the \texttt{RecoveryRequest} is deleted to refund gas.
+        \end{itemize}
+    \end{enumerate}
+
+    \subsubsection{Analysis of Phonebook Security (\texttt{test\_CannotRevealTooEarly})}
+    This test verifies the front-running protection using the commit-reveal scheme.
+    \begin{enumerate}
+        \item \textbf{Commit:} The MNO commits a hash.
+        \begin{itemize}
+            \item \textit{State Change:} The commitment is stored with the current timestamp.
+        \end{itemize}
+        \item \textbf{Attack:} The MNO attempts to call \texttt{reveal} immediately.
+        \item \textbf{Assertion:} The call reverts with ``Reveal too early''.
+        \begin{itemize}
+            \item \textit{Gas Used:} 21,345.
+            The revert occurs before any state changes, so gas usage is minimal.
+        \end{itemize}
+    \end{enumerate}
+
+    \section{Sepolia Deployment}
+
+    The contracts were successfully compiled and deployed to the \textbf{Sepolia Ethereum Testnet}, a Proof-of-Stake test network that mirrors Mainnet conditions using the Remix IDE and MetaMask wallet.
+
+    \subsection{Deployment Details}
+    \begin{itemize}
+        \item \textbf{Network:} Sepolia Testnet (Chain ID: 11155111)
+        \item \textbf{RecoveryWallet Contract Address:} \\ \texttt{0xeeF3b40ab8e891BD340D47b030D7eD10D4b02E24}
+        \item \textbf{Phonebook Contract Address:} \\ \texttt{0x27c7730125E24592A7a673029FeA53B25125Aa66}
+    \end{itemize}
+
+    \subsection{Gas Analysis}
+    Gas efficiency is critical for mobile money users who may have limited balances.
+    We analyzed the gas costs observed during Sepolia deployment and execution.
+    The \texttt{Phonebook} operations are highly optimized, costing about US\$0.50 (assuming ETH=US\$2802) for a full registration cycle.
+    \subsection{Transaction Verification}
+    We verified the deployment via Etherscan.
+    The transaction chains confirm:
+    \begin{enumerate}
+        \item \textbf{Event Emission:} The \texttt{RecoveryInitiated} and \texttt{Commit} events are correctly emitted and indexed.
+        This allows off-chain services (like the MNO dashboard) to listen for updates in real-time as shown in Figures~\ref{fig:etherscan} and~\ref{fig:etherscan_2}.
+        \item \textbf{State Persistence:} Subsequent reads of the \texttt{guardianCount} and \texttt{phoneToWallet} mappings returned the correct values set during the write transactions, confirming data integrity on the public ledger.
+    \end{enumerate}
+
+    % insert screenshot of etherscan here
+    \begin{figure}[H]
+        \centering
+        % Screenshot Placeholder: Etherscan Transaction Details
+        % import image from local directory
+        \includegraphics[width=0.9\textwidth]{phonebook}
+        \caption{Etherscan Verification of Phonebook Contract Events}
+        \label{fig:etherscan}
+    \end{figure}
+
+    \begin{figure}[H]
+        \centering
+        % Screenshot Placeholder: Etherscan Transaction Details
+        % import image from local directory
+        \includegraphics[width=0.9\textwidth]{recovery}
+        \caption{Etherscan Verification of RecoveryWallet Contract Events}
+        \label{fig:etherscan_2}
+    \end{figure}
+
+
+    \section{Security \& Risk Analysis}
+
+    \subsection{Threat Model \& Mitigation}
+    We analyzed the system against common attack vectors in the DeFi space and mobile money ecosystem.
+    Key threats include:
+    \begin{itemize}
+        \item \textbf{SIM-Swap Attacks:} Mitigated by decoupling identity from security.
+        Even if the SIM is swapped, the attacker cannot access funds without guardian approval.
+        \item \textbf{Compromised Guardians:} The threshold mechanism ensures that multiple guardians must collude to steal funds, reducing the risk from a single compromised guardian.
+        \item \textbf{Replay Attacks:} The use of nonces in the recovery process prevents old signatures of recoveries from being reused.
+        \item \textbf{Front-Running:} The commit-reveal scheme in the Phonebook prevents attackers from preemptively registering phone numbers.
+        \item \textbf{Reentrancy Attacks:} The manual reentrancy guard prevents malicious contracts from exploiting the \texttt{execute} function.
+        \item \textbf{Sybil Attacks:} Restricting write access to the Phonebook to the MNO prevents attackers from flooding the registry with fake identities.
+    \end{itemize}
+
+    \subsection{Residual Risks}
+    \begin{itemize}
+        \item \textbf{MNO Centralization:} The system still relies on the MNO for the USSD gateway and Phonebook registration.
+        If the MNO is malicious, they can censor transactions but cannot steal funds (safety).
+        \item \textbf{Java Card Vulnerability:} While rare, side-channel attacks on SIM cards are possible.
+        However, this requires physical access to the SIM, which is outside the scope of remote network attacks.
+    \end{itemize}
+
+
+    \section{Conclusion \& Future Work}
+    The smart contract implementation successfully demonstrates that high-security, non-custodial finance can be made accessible to feature phone users.
+    By combining the hardware security of legacy SIM cards with the programmable logic of Ethereum smart contracts, we eliminate the SIM-swap vulnerability that plagues the current mobile money ecosystem.
+    Future work will focus on:
+    \begin{enumerate}
+        \item \textbf{Gas Abstraction:} Implementing meta-transactions to allow users to pay gas fees in stablecoins or have the MNO sponsor gas costs~\cite{eip4337}.
+        \item \textbf{Multi-Chain Support:} Extending the wallet to support Layer 2 solutions (e.g., Polygon) to reduce transaction costs further.
+        \item \textbf{Integration with DeFi:} Allowing users to earn interest on their mobile money balances via DeFi protocols directly from the wallet.
+    \end{enumerate}
+
+    \subsection{AI Disclosure}
+    AI was used to get ideas for the project and guide on the approach to solve the SIM Swap problem (interaction can be found here \url{https://chatgpt.com/share/692ea93b-62a0-8013-8c81-0bc71767b7b0}). Additionally, Remix IDE's AI Assistant was used to help generate test cases for the Solidity contracts to run on the Foundry framework.
+
+
+% --- References ---
+    \newpage
+    \bibliographystyle{IEEEtran}
+    \bibliography{main}
+
+\end{document}
